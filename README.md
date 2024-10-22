@@ -71,10 +71,10 @@ DOCKER_REPOSITORY=your_repository
 docker build -t $DOCKER_REPOSITORY --platform linux/x86_64 .
 docker push $DOCKER_REPOSITORY
 ```
-After building image, modify `jobs.<job name>.container.image` to `<your_repository>`.
 
 ## 3. Modify container image name in workflows dir.
 
+After building image, modify `jobs.<job name>.container.image` to `<your_repository>`.
 ```sh
 sed -i "s|imuratashared/konnect-apiops|$DOCKER_REPOSITORY|g" .github/workflows/*
 ```
