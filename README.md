@@ -40,7 +40,7 @@ The following in Konnect should be prepared in advance.
 - API Product
 - API Product's Version
 
-
+And you need to activate GitHub Runner.
 
 # How to use
 ## 1. Set Repository Secret and Environment variables
@@ -73,7 +73,7 @@ docker push $DOCKER_REPOSITORY
 ```
 After building image, modify `jobs.<job name>.container.image` to `<your_repository>`.
 
-## 3. Modify container image name　in workflows dir.
+## 3. Modify container image name in workflows dir.
 
 ```sh
 sed -i "s|imuratashared/konnect-apiops|$DOCKER_REPOSITORY|g" .github/workflows/*
