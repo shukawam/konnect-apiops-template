@@ -65,6 +65,7 @@ gh variable set TAG -b "httpbin"
 ```
 
 ## 2. Build Container Image
+If you want to create and manage your own image instead of the one I created (`imuratashared/konnect-apiops`), you can build and push it.
 
 ```sh
 DOCKER_REPOSITORY=your_repository
