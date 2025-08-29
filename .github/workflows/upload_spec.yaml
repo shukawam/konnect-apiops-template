@@ -14,20 +14,25 @@ on:
       - completed 
 
 env:
-  REGIONAL_EP: "https://${{ vars.KONNECT_REGION }}.api.konghq.com/v2"
+  REGIONAL_EP: "https://${{ vars.KONNECT_REGION }}.api.konghq.com/v3"
   AUTH_HEADER: "Authorization: Bearer ${{ secrets.KONNECT_TOKEN }}"
   PRODUCT_NAME: "${{ vars.PRODUCT_NAME }}"
-  VERSION_NAME: "${{ vars.VERSION_NAME }}"
 
 jobs:
   upload-spec:
     if: ${{ github.event.workflow_run.conclusion == 'success' }} 
     runs-on: ubuntu-latest
     container:
-      image: imuratashared/konnect-apiops
+      image: ubuntu
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install command
+        run: |
+          apt-get update -y
+          apt-get install -y curl jq
+          curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
       - name: Upload api-spec.yaml
         shell: bash
         run: |
@@ -39,7 +44,7 @@ jobs:
 
           # Get Product ID from PRODUCT_NAME.
           PRODUCT_ID=$(curl -X GET -s \
-                         ${REGIONAL_EP}/api-products \
+                         ${REGIONAL_EP}/apis \
                          -H "${AUTH_HEADER}" \
                        | jq -r '.data[] | select(.name == "'"$PRODUCT_NAME"'") | .id' || true)
 
@@ -47,48 +52,38 @@ jobs:
               echo "[Error] Failed to obtain PRODUCT_ID or obtained multiple PRODUCT_NAME: $PRODUCT_NAME, PRODUCT_IDs: $PRODUCT_ID"
               exit 1
           fi
-          # Get version ID from VERSION_NAME.
-          VERSION_ID=$(curl -X GET -s \
-              ${REGIONAL_EP}/api-products/${PRODUCT_ID}/product-versions \
-              -H "${AUTH_HEADER}" \
-              | jq -r '.data[] | select(.name == "'"$VERSION_NAME"'") | .id' || true)
-          if [ -z "$VERSION_ID" ]; then
-              echo "[Error] Failed to get Version ID."
-              exit 1
-          fi
-          # Remove path.
+
           filename=$(basename "$file")
 
           SPEC_ID=$(curl -s -X GET \
-              ${REGIONAL_EP}/api-products/${PRODUCT_ID}/product-versions/${VERSION_ID}/specifications \
+              ${REGIONAL_EP}/apis/${PRODUCT_ID}/versions \
               -H "${AUTH_HEADER}" \
-              | jq -r --arg filename "$filename" '.data[] | select(.name == $filename) | .id' || true)
-          
-          # Encode the file contents in base64
-          CONTENT=$(base64 -w0 "$file")
+              | jq -r '.data[].id' || true)
+
+          # Create payload
+          SPEC_VERSION=$(yq '.info.version' docs/openapi/api-spec.yaml)
+          jq -n \
+            --arg version "$SPEC_VERSION" \
+            --arg content "$(yq -o=json '.' docs/openapi/api-spec.yaml | jq -c .)" \
+            '{version: $version, spec: {content: $content}}' > payload.json
 
           if [ -z "$SPEC_ID" ]; then
-              # If no specification exists, create a new one
-              action=create
-              curl_response=$(curl -w "\n%{http_code}" -X POST \
-                  ${REGIONAL_EP}/api-products/${PRODUCT_ID}/product-versions/${VERSION_ID}/specifications \
-                  -H "Content-Type: application/json" \
-                  -H "${AUTH_HEADER}" \
-                  -d '{
-                  "name": "'"$filename"'",
-                  "content": "'"$CONTENT"'"
-                  }')
+            # If no specification exists, create a new one
+            action=create
+            UPLOAD_ENDPOINT=${REGIONAL_EP}/apis/${PRODUCT_ID}/versions
+            METHOD=POST
           else
-              # If the specification exists, update it
-              action=update
-              curl_response=$(curl -w "\n%{http_code}" -X PATCH \
-                  ${REGIONAL_EP}/api-products/${PRODUCT_ID}/product-versions/${VERSION_ID}/specifications/${SPEC_ID} \
-                  -H "Content-Type: application/json" \
-                  -H "${AUTH_HEADER}" \
-                  -d '{
-                  "content": "'"$CONTENT"'"
-                  }')
+            # If the specification exists, update it
+            action=update
+            UPLOAD_ENDPOINT=${REGIONAL_EP}/apis/${PRODUCT_ID}/versions/$SPEC_ID
+            METHOD=PATCH
           fi
+
+          curl_response=$(curl -w "\n%{http_code}" -X $METHOD \
+            ${UPLOAD_ENDPOINT} \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/json" \
+            --data-binary @payload.json)     
       
           http_code=$(echo "$curl_response" | tail -n 1)
           # Check if the curl command succeeded
