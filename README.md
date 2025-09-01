@@ -73,9 +73,7 @@ After building image, modify `jobs.<job name>.container.image` to `<your_reposit
 
 ### Modify container image name　in workflows dir.
 
-```sh
-sed -i "s|imuratashared/konnect-apiops|$DOCKER_REPOSITORY|g" .github/workflows/*
-```
+You modify the job and change the flow to use the created image.
 
 ## 3. Run Workflow
 If you update `api-spec.yaml`, GitHub Runner runs `deploy_oas.yaml` and `upload_spec.yaml`.
