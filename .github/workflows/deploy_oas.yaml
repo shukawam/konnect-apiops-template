@@ -84,5 +84,9 @@ jobs:
     container:
       image: ubuntu
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Confirmation
-        run: ./tests/e2e.sh nothing
+        run: |
+          ./tests/e2e.sh nothing
