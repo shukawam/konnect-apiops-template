@@ -6,7 +6,7 @@ on:
       - docs/product.md
 
 env:
-  REGIONAL_EP: "https://${{ vars.KONNECT_REGION }}.api.konghq.com/v2"
+  REGIONAL_EP: "https://${{ vars.KONNECT_REGION }}.api.konghq.com/v3"
   AUTH_HEADER: "Authorization: Bearer ${{ secrets.KONNECT_TOKEN }}"
   PRODUCT_NAME: "${{ vars.PRODUCT_NAME }}"
 
@@ -14,10 +14,16 @@ jobs:
   upload-doc:
     runs-on: ubuntu-latest
     container:
-      image: imuratashared/konnect-apiops
+      image: ubuntu
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install command
+        run: |
+          apt-get update -y
+          apt-get install -y curl jq
+          curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
       - name: Upload product.md
         shell: bash
         run: |
@@ -29,7 +35,7 @@ jobs:
 
           # Get Product ID from PRODUCT_NAME.
           PRODUCT_ID=$(curl -X GET -s \
-                         ${REGIONAL_EP}/api-products \
+                         ${REGIONAL_EP}/apis \
                          -H "${AUTH_HEADER}" \
                        | jq -r '.data[] | select(.name == "'"$PRODUCT_NAME"'") | .id' || true)
 
@@ -47,36 +53,38 @@ jobs:
             -H "${AUTH_HEADER}" \
             | jq -r --arg filename "${filename}" '.data[] | select(.title == $filename) | .id' || true)
 
-          # Encode the file contents in base64
-          CONTENT=$(base64 -w0 "$file")
-
           if [ -z "$DOC_ID" ]; then
             # If no document exists, create a new one
             action=create
-            curl_response=$(curl -w "\n%{http_code}" -X POST \
-              ${REGIONAL_EP}/api-products/${PRODUCT_ID}/documents \
-              -H "${AUTH_HEADER}" \
-              -H "Content-Type: application/json" \
-              -d '{
-                "slug": "'"$filename"'",
-                "status": "published",
-                "title": "'"$filename"'",
-                "content": "'"$CONTENT"'",
-                "metadata": {
-                  "author": "John Doe"
-                }
-              }')
+            # Create payload
+            jq -n \
+              --arg slug "$filename" \
+              --arg status "published" \
+              --arg title "$filename" \
+              --rawfile content "$file" \
+              '{
+                slug: $slug,
+                status: $status,
+                title: $title,
+                content: $content
+              }' > payload.json
+            UPLOAD_ENDPOINT=${REGIONAL_EP}/apis/${PRODUCT_ID}/documents
+            METHOD=POST
           else
             # If the document exists, update it
             action=update
-            curl_response=$(curl -w "\n%{http_code}" -X PATCH \
-              ${REGIONAL_EP}/api-products/${PRODUCT_ID}/documents/$DOC_ID \
-              -H "${AUTH_HEADER}" \
-              -H "Content-Type: application/json" \
-              -d '{
-                "content": "'"$CONTENT"'"
-              }')
+            # Create payload
+            jq -n --rawfile content "$file" \
+              '{content: $content}' > payload.json
+            UPLOAD_ENDPOINT=${REGIONAL_EP}/apis/${PRODUCT_ID}/documents/$DOC_ID
+            METHOD=PATCH
           fi
+
+          curl_response=$(curl -w "\n%{http_code}" -X $METHOD \
+            ${UPLOAD_ENDPOINT} \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/json" \
+            --data-binary @payload.json)
 
           http_code=$(echo "$curl_response" | tail -n 1)
 
