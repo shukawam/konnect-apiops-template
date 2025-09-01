@@ -14,10 +14,16 @@ jobs:
   upload-doc:
     runs-on: ubuntu-latest
     container:
-      image: imuratashared/konnect-apiops
+      image: ubuntu
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install command
+        run: |
+          apt-get update -y
+          apt-get install -y curl jq
+          curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
       - name: Upload product.md
         shell: bash
         run: |
