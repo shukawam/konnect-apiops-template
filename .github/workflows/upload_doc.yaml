@@ -22,8 +22,6 @@ jobs:
         run: |
           apt-get update -y
           apt-get install -y curl jq
-          curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
-          chmod +x /usr/local/bin/yq
       - name: Upload product.md
         shell: bash
         run: |
@@ -49,7 +47,7 @@ jobs:
 
           # Get Document ID
           DOC_ID=$(curl -s -X GET \
-            ${REGIONAL_EP}/api-products/${PRODUCT_ID}/documents \
+            ${REGIONAL_EP}/apis/${PRODUCT_ID}/documents \
             -H "${AUTH_HEADER}" \
             | jq -r --arg filename "${filename}" '.data[] | select(.title == $filename) | .id' || true)
 
@@ -84,7 +82,7 @@ jobs:
             ${UPLOAD_ENDPOINT} \
             -H "${AUTH_HEADER}" \
             -H "Content-Type: application/json" \
-            --data-binary @payload.json)
+            --data-binary @payload.json)          
 
           http_code=$(echo "$curl_response" | tail -n 1)
 
