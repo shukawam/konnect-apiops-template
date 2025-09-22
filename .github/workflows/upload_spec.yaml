@@ -61,10 +61,10 @@ jobs:
               | jq -r '.data[].id' || true)
 
           # Create payload
-          SPEC_VERSION=$(yq '.info.version' docs/openapi/api-spec.yaml)
+          SPEC_VERSION=$(yq '.info.version' $file)
           jq -n \
             --arg version "$SPEC_VERSION" \
-            --arg content "$(yq -o=json '.' docs/openapi/api-spec.yaml | jq -c .)" \
+            --arg content "$(yq -o=json '.' $file | jq -c .)" \
             '{version: $version, spec: {content: $content}}' > payload.json
 
           if [ -z "$SPEC_ID" ]; then
