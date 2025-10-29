@@ -10,6 +10,7 @@ env:
   KONNECT_URL: "https://${{ vars.KONNECT_REGION }}.api.konghq.com"
   CONTROL_PLANE: ${{ vars.CONTROL_PLANE }}
   TAG: ${{ vars.TAG }}
+  SPECFILE: docs/openapi/api-spec.yaml
 
 jobs:
   lint-spec:
